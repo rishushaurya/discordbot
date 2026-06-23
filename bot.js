@@ -155,131 +155,6 @@ async function registerSlashCommands() {
           .addIntegerOption(opt => opt.setName('seconds').setDescription('Cooldown in seconds (0 to disable)').setRequired(true))
           .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes (default 60)').setRequired(false))
       )
-      .toJSON(),
-
-    // Owner commands — HIDDEN from everyone; only owner (lamey) can see & use
-    new SlashCommandBuilder()
-      .setName('owner')
-      .setDescription('Lilgooner owner controls (lamey only)')
-      .setDefaultMemberPermissions('0')
-      .addSubcommand(sub =>
-        sub.setName('banish')
-          .setDescription('Banish a user to receive savage roasts')
-          .addUserOption(opt => opt.setName('user').setDescription('User to banish').setRequired(true))
-          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes').setRequired(false))
-      )
-      .addSubcommand(sub =>
-        sub.setName('unbanish')
-          .setDescription('Instantly unbanish a user')
-          .addUserOption(opt => opt.setName('user').setDescription('User to unbanish').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('bless')
-          .setDescription('Bless a user to receive soft glaze')
-          .addUserOption(opt => opt.setName('user').setDescription('User to bless').setRequired(true))
-          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes').setRequired(false))
-      )
-      .addSubcommand(sub =>
-        sub.setName('unbless')
-          .setDescription('Instantly unbless a user')
-          .addUserOption(opt => opt.setName('user').setDescription('User to unbless').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('config')
-          .setDescription('Modify personality config')
-          .addStringOption(opt =>
-            opt.setName('setting')
-              .setDescription('Setting to update')
-              .setRequired(true)
-              .addChoices(
-                { name: 'Toxicity Level', value: 'toxicity_level' },
-                { name: 'Slang Intensity', value: 'slang_intensity' },
-                { name: 'Emoji Frequency', value: 'emoji_frequency' },
-                { name: 'Reset All Config', value: 'reset_all' }
-              )
-          )
-          .addStringOption(opt => opt.setName('value').setDescription('New value (ignored if resetting)').setRequired(false))
-      )
-      .addSubcommand(sub =>
-        sub.setName('impersonate')
-          .setDescription('Speak in the owner\'s voice')
-          .addStringOption(opt => opt.setName('content').setDescription('What to say').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('vibecheck')
-          .setDescription('Force server-wide vibe check')
-      )
-      .addSubcommand(sub =>
-        sub.setName('ghost')
-          .setDescription('Ghost a user completely (the bot ignores them)')
-          .addUserOption(opt => opt.setName('user').setDescription('User to ghost').setRequired(true))
-          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes').setRequired(false))
-      )
-      .addSubcommand(sub =>
-        sub.setName('unghost')
-          .setDescription('Instantly stop ghosting a user')
-          .addUserOption(opt => opt.setName('user').setDescription('User to unghost').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('puppet')
-          .setDescription('Puppet a user (bot agrees with them sarcastically)')
-          .addUserOption(opt => opt.setName('user').setDescription('User to puppet').setRequired(true))
-          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes').setRequired(false))
-      )
-      .addSubcommand(sub =>
-        sub.setName('unpuppet')
-          .setDescription('Instantly stop puppeting a user')
-          .addUserOption(opt => opt.setName('user').setDescription('User to unpuppet').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('chaos')
-          .setDescription('Toggle chaos mode (bot randomly roasts users)')
-          .addBooleanOption(opt => opt.setName('active').setDescription('Whether chaos mode is active').setRequired(true))
-          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes').setRequired(false))
-      )
-      .addSubcommand(sub =>
-        sub.setName('nickname')
-          .setDescription('Set bot nickname for a user')
-          .addUserOption(opt => opt.setName('user').setDescription('User to nickname').setRequired(true))
-          .addStringOption(opt => opt.setName('name').setDescription('Nickname (or "clear" to remove)').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('announce')
-          .setDescription('Make a dramatic announcement')
-          .addStringOption(opt => opt.setName('message').setDescription('Message to announce').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('brainrot')
-          .setDescription('Toggle brainrot mode (makes bot talk only in heavy brainrot)')
-          .addBooleanOption(opt => opt.setName('active').setDescription('Whether brainrot mode is active').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('nsfw')
-          .setDescription('Toggle NSFW unrestricted mode for a user')
-          .addUserOption(opt => opt.setName('user').setDescription('User to toggle NSFW mode for').setRequired(true))
-          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes (omit for permanent)').setRequired(false))
-      )
-      .addSubcommand(sub =>
-        sub.setName('unsfw')
-          .setDescription('Instantly remove NSFW mode from a user')
-          .addUserOption(opt => opt.setName('user').setDescription('User to remove NSFW from').setRequired(true))
-      )
-      .addSubcommand(sub =>
-        sub.setName('mood')
-          .setDescription('Set bot-wide server mood flavor')
-          .addStringOption(opt =>
-            opt.setName('mood')
-              .setDescription('Mood flavor')
-              .setRequired(true)
-              .addChoices(
-                { name: 'Petty 💅', value: 'petty' },
-                { name: 'Chaotic 😈', value: 'chaotic' },
-                { name: 'Wholesome 🥺', value: 'wholesome' },
-                { name: 'Menacing 💀', value: 'menacing' }
-              )
-          )
-          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes (default 60)').setRequired(false))
-      )
       .toJSON()
   ];
 
@@ -774,6 +649,34 @@ Provide a quick judgmental one-liner rating their energy/vibe.`;
   }
 }
 
+// Helper: Send an ephemeral-like message by sending and deleting after a delay
+async function sendEphemeralReply(message, replyContent, deleteDelay = 5000) {
+  try {
+    // Delete the original command message (to hide the !owner command)
+    try {
+      if (message.deletable) {
+        await message.delete();
+      }
+    } catch (e) {
+      console.warn("Failed to delete original owner command message:", e.message);
+    }
+    
+    // Send response
+    const responseMsg = await message.channel.send(replyContent);
+    
+    // Auto delete response
+    setTimeout(async () => {
+      try {
+        await responseMsg.delete();
+      } catch (e) {
+        console.warn("Failed to delete ephemeral reply:", e.message);
+      }
+    }, deleteDelay);
+  } catch (err) {
+    console.error("Error sending ephemeral reply:", err);
+  }
+}
+
 client.on('messageCreate', async (message) => {
   // 1. Ignore DMs completely
   if (!message.guild || message.channel.type === ChannelType.DM) {
@@ -787,6 +690,353 @@ client.on('messageCreate', async (message) => {
 
   const userId = message.author.id;
   const guildId = message.guild.id;
+
+  // Intercept Owner Prefix Commands
+  if (message.content.startsWith('!owner') && userId === OWNER_DISCORD_ID) {
+    const args = message.content.split(/\s+/).slice(1);
+    const subcommand = args[0] ? args[0].toLowerCase() : '';
+
+    switch (subcommand) {
+      case 'banish': {
+        const targetStr = args[1];
+        const duration = parseInt(args[2], 10) || 60;
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        await db.setBanishBlessStatus(targetUser.id, 'banished', duration);
+        await sendEphemeralReply(message, `banished <@${targetUser.id}> for the next ${duration} minutes. they are cooked fr 💀`);
+        return;
+      }
+
+      case 'unbanish': {
+        const targetStr = args[1];
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        await db.setBanishBlessStatus(targetUser.id, null, 0);
+        await sendEphemeralReply(message, `lifted banishment for <@${targetUser.id}>. they are off the hook 🗿`);
+        return;
+      }
+
+      case 'bless': {
+        const targetStr = args[1];
+        const duration = parseInt(args[2], 10) || 60;
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        await db.setBanishBlessStatus(targetUser.id, 'blessed', duration);
+        await sendEphemeralReply(message, `<@${targetUser.id}> has been blessed for the next ${duration} minutes. they get the glaze treatment now 🥺`);
+        return;
+      }
+
+      case 'unbless': {
+        const targetStr = args[1];
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        await db.setBanishBlessStatus(targetUser.id, null, 0);
+        await sendEphemeralReply(message, `lifted blessing for <@${targetUser.id}>. no more free glaze 🥱`);
+        return;
+      }
+
+      case 'config': {
+        const setting = args[1];
+        const val = args.slice(2).join(' ');
+        
+        if (setting === 'reset_all') {
+          await db.resetPersonalityConfig(guildId);
+          tempToxicitySettings.delete(guildId);
+          await sendEphemeralReply(message, `personality configurations have been reset to normal defaults! ⚙️`);
+          return;
+        }
+
+        if (!setting || (!val && setting !== 'reset_all')) {
+          await sendEphemeralReply(message, `you must provide a setting and a value to modify 💀`);
+          return;
+        }
+        
+        if (setting === 'toxicity_level') {
+          const valStr = val.toLowerCase();
+          if (valStr.includes('hour') || valStr.includes('feral') || valStr.includes('bit') || valStr.includes('nice')) {
+            if (valStr.includes('feral') || valStr.includes('10')) {
+              tempToxicitySettings.set(guildId, { override: 10, expires: Date.now() + 60 * 60 * 1000 });
+              await sendEphemeralReply(message, "fine, i'll go feral and roast everyone for the next hour 💀🔥");
+            } else if (valStr.includes('nice') || valStr.includes('1') || valStr.includes('0')) {
+              tempToxicitySettings.set(guildId, { override: 1, expires: Date.now() + 30 * 60 * 1000 });
+              await sendEphemeralReply(message, "ugh, fine. i will be nice for 30 minutes. don't get used to it 🙄");
+            }
+          } else {
+            const num = parseInt(val, 10);
+            if (!isNaN(num)) {
+              const clamped = Math.max(0, Math.min(10, num));
+              await db.updatePersonalityConfig(guildId, { toxicity_level: clamped });
+              await sendEphemeralReply(message, `toxicity level updated to ${clamped} bot-wide 🗿`);
+            }
+          }
+        } else if (setting === 'slang_intensity') {
+          const num = parseInt(val, 10);
+          if (!isNaN(num)) {
+            const clamped = Math.max(0, Math.min(10, num));
+            await db.updatePersonalityConfig(guildId, { slang_intensity: clamped });
+            await sendEphemeralReply(message, `slang intensity updated to ${clamped} 🗣️`);
+          }
+        } else if (setting === 'emoji_frequency') {
+          const num = parseInt(val, 10);
+          if (!isNaN(num)) {
+            const clamped = Math.max(0, Math.min(10, num));
+            await db.updatePersonalityConfig(guildId, { emoji_frequency: clamped });
+            await sendEphemeralReply(message, `emoji frequency updated to ${clamped} 💀`);
+          }
+        } else {
+          await sendEphemeralReply(message, `invalid configuration settings 💀`);
+        }
+        return;
+      }
+
+      case 'impersonate': {
+        const content = args.slice(1).join(' ');
+        if (!content) {
+          await sendEphemeralReply(message, `what do you want me to say? 💀`);
+          return;
+        }
+        try {
+          if (message.deletable) await message.delete();
+        } catch (e) {}
+        await message.channel.send(content);
+        
+        const confirmMsg = await message.channel.send(`sent impersonation message: "${content}"`);
+        setTimeout(async () => {
+          try {
+            await confirmMsg.delete();
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+
+      case 'vibecheck': {
+        try {
+          if (message.deletable) await message.delete();
+        } catch (e) {}
+        const vMsg = await message.channel.send("🚨 **SERVER VIBE CHECK TIME** 🚨\nReact to this message with any emoji in the next 30 seconds to get your aura rated and roasted! Do it or you're mid 💀");
+        const filter = (reaction, user) => !user.bot;
+        const collector = vMsg.createReactionCollector({ filter, time: 30000 });
+        const reactedUsers = new Set();
+
+        collector.on('collect', async (reaction, user) => {
+          if (reactedUsers.has(user.id)) return;
+          reactedUsers.add(user.id);
+          
+          const userAura = await db.getAuraPoints(user.id);
+          const promptText = `Generate a 1-sentence savage roast or funny compliment for user ${user.username} (Aura points: ${userAura}) who reacted to our server vibe check.`;
+          try {
+            const response = await groq.queryGroq(
+              [{ role: 'user', content: promptText }],
+              false,
+              await db.getPersonalityConfig(guildId),
+              user.username,
+              user.id,
+              await db.getBanishBlessStatus(user.id),
+              false
+            );
+            await vMsg.reply(`<@${user.id}>: ${response.content}`);
+          } catch (err) {
+            console.error(err);
+          }
+        });
+
+        collector.on('end', () => {
+          vMsg.reply("vibe check closed. thanks for yapping 💀");
+        });
+
+        const confirmMsg = await message.channel.send("started server vibe check!");
+        setTimeout(async () => {
+          try {
+            await confirmMsg.delete();
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+
+      case 'ghost': {
+        const targetStr = args[1];
+        const duration = parseInt(args[2], 10) || 60;
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        ghostedUsers.set(`${guildId}-${targetUser.id}`, Date.now() + duration * 60 * 1000);
+        await sendEphemeralReply(message, `ghosted <@${targetUser.id}> for ${duration} minutes. bot is ignoring them completely. 😶`);
+        return;
+      }
+
+      case 'unghost': {
+        const targetStr = args[1];
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        ghostedUsers.delete(`${guildId}-${targetUser.id}`);
+        await sendEphemeralReply(message, `unghosted <@${targetUser.id}>. bot will respond to them again.`);
+        return;
+      }
+
+      case 'puppet': {
+        const targetStr = args[1];
+        const duration = parseInt(args[2], 10) || 60;
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        puppetedUsers.set(`${guildId}-${targetUser.id}`, Date.now() + duration * 60 * 1000);
+        await sendEphemeralReply(message, `puppeted <@${targetUser.id}> for ${duration} minutes. bot will agree with everything they say sarcastically. 🧸`);
+        return;
+      }
+
+      case 'unpuppet': {
+        const targetStr = args[1];
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        puppetedUsers.delete(`${guildId}-${targetUser.id}`);
+        await sendEphemeralReply(message, `unpuppeted <@${targetUser.id}>. bot will act normally with them now.`);
+        return;
+      }
+
+      case 'chaos': {
+        const activeStr = args[1];
+        const duration = parseInt(args[2], 10) || 60;
+        const active = activeStr === 'true' || activeStr === 'yes' || activeStr === '1' || activeStr === 'on';
+        
+        if (!active) {
+          chaosMode.delete(guildId);
+          await sendEphemeralReply(message, "chaos mode disabled fr. bot will behave.");
+          return;
+        }
+        chaosMode.set(guildId, Date.now() + duration * 60 * 1000);
+        await sendEphemeralReply(message, `chaos mode enabled for ${duration} minutes. bot will randomly roast people in this server 😈`);
+        return;
+      }
+
+      case 'nickname': {
+        const targetStr = args[1];
+        const name = args.slice(2).join(' ');
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+        if (!name) {
+          await sendEphemeralReply(message, `you must provide a nickname or "clear" 💀`);
+          return;
+        }
+
+        if (name.toLowerCase() === 'clear') {
+          await db.removeNickname(targetUser.id);
+          await sendEphemeralReply(message, `cleared nickname override for <@${targetUser.id}>.`);
+        } else {
+          await db.setNickname(targetUser.id, name);
+          await sendEphemeralReply(message, `set nickname override for <@${targetUser.id}> to "${name}".`);
+        }
+        return;
+      }
+
+      case 'announce': {
+        const messageContent = args.slice(1).join(' ');
+        if (!messageContent) {
+          await sendEphemeralReply(message, `what do you want me to announce? 💀`);
+          return;
+        }
+        try {
+          if (message.deletable) await message.delete();
+        } catch (e) {}
+        await message.channel.send(`📢 **ANNOUNCEMENT FROM THE OWNER** 📢\n\n${messageContent}\n\n*respect the authority fr 💀*`);
+        
+        const confirmMsg = await message.channel.send("announcement sent!");
+        setTimeout(async () => {
+          try {
+            await confirmMsg.delete();
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+
+      case 'brainrot': {
+        const activeStr = args[1];
+        const active = activeStr === 'true' || activeStr === 'yes' || activeStr === '1' || activeStr === 'on';
+        
+        brainrotMode.set(guildId, active);
+        await sendEphemeralReply(message, `brainrot mode is now **${active ? 'ENABLED' : 'DISABLED'}** server-wide. ${active ? 'skibidi time 💀' : 'back to normal casual yapping.'}`);
+        return;
+      }
+
+      case 'nsfw': {
+        const targetStr = args[1];
+        const durationStr = args[2];
+        const duration = durationStr ? parseInt(durationStr, 10) : null;
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+
+        await db.setNsfwAccess(guildId, targetUser.id, duration);
+
+        if (duration) {
+          await sendEphemeralReply(message, `NSFW unrestricted mode enabled for <@${targetUser.id}> for the next ${duration} minutes. 😈`);
+        } else {
+          await sendEphemeralReply(message, `NSFW unrestricted mode enabled permanently for <@${targetUser.id}>. 😈`);
+        }
+        return;
+      }
+
+      case 'unsfw': {
+        const targetStr = args[1];
+        const targetUser = await resolveUser(message, targetStr);
+        if (!targetUser) {
+          await sendEphemeralReply(message, `could not find user "${targetStr || ''}" 💀`);
+          return;
+        }
+
+        await db.removeNsfwAccess(guildId, targetUser.id);
+        const nsfwConvKey = `${message.channel.id}-${targetUser.id}`;
+        nsfwConversations.delete(nsfwConvKey);
+
+        await sendEphemeralReply(message, `NSFW unrestricted mode removed for <@${targetUser.id}>.`);
+        return;
+      }
+
+      case 'mood': {
+        const mood = args[1];
+        const duration = parseInt(args[2], 10) || 60;
+        
+        if (!mood || !['petty', 'chaotic', 'wholesome', 'menacing'].includes(mood.toLowerCase())) {
+          await sendEphemeralReply(message, `invalid mood 💀 choices: petty, chaotic, wholesome, menacing`);
+          return;
+        }
+
+        await db.setServerMood(guildId, mood.toLowerCase(), duration);
+        await sendEphemeralReply(message, `server mood set to **${mood.toUpperCase()}** for the next ${duration} minutes. let's see how i feel about this 🙄`);
+        return;
+      }
+      default: {
+        await sendEphemeralReply(message, `invalid owner subcommand: "${subcommand || ''}" 💀`);
+        return;
+      }
+    }
+  }
 
   // 3. Ghost Check (Owner Troll Power) - Completely ignores the user (100% silent)
   if (ghostedUsers.has(`${guildId}-${userId}`)) {
@@ -847,11 +1097,13 @@ client.on('messageCreate', async (message) => {
   const isMentioned = message.mentions.has(client.user) && !message.mentions.everyone;
   
   let isReplyToBot = false;
+  let replyToMessage = null;
   if (message.reference && message.reference.messageId) {
     try {
       const refMessage = await message.channel.messages.fetch(message.reference.messageId);
       if (refMessage.author.id === client.user.id) {
         isReplyToBot = true;
+        replyToMessage = refMessage;
       }
     } catch (err) {
       // ignore
@@ -872,6 +1124,49 @@ client.on('messageCreate', async (message) => {
   // If not mentioned, not a reply, and not chaos triggered, do not reply
   if (!isMentioned && !isReplyToBot && !isChaosTrigger) {
     return;
+  }
+
+  // 7b. Trace Thread Context for Reply-Based Joins
+  let threadContext = null;
+  if (isReplyToBot && replyToMessage) {
+    try {
+      let originalUserId = null;
+      if (replyToMessage.reference && replyToMessage.reference.messageId) {
+        const origMessage = await message.channel.messages.fetch(replyToMessage.reference.messageId);
+        originalUserId = origMessage.author.id;
+      }
+      
+      if (!originalUserId && replyToMessage.mentions && replyToMessage.mentions.users.size > 0) {
+        const mentionedUser = replyToMessage.mentions.users.filter(u => u.id !== client.user.id).first();
+        if (mentionedUser) {
+          originalUserId = mentionedUser.id;
+        }
+      }
+
+      if (!originalUserId) {
+        const mentionMatch = replyToMessage.content.match(/<@!?(\d+)>/);
+        if (mentionMatch) {
+          originalUserId = mentionMatch[1];
+        }
+      }
+
+      if (originalUserId && originalUserId !== userId) {
+        const isNsfw = await db.getNsfwAccess(guildId, userId);
+        const originalUserKey = `${message.channel.id}-${originalUserId}`;
+        const history = isNsfw ? nsfwConversations.get(originalUserKey) : userConversations.get(originalUserKey);
+        
+        if (history && history.length > 0) {
+          let historyStr = "";
+          history.forEach(m => {
+            const roleStr = m.role === 'assistant' ? 'lilgooner' : (m.name || 'user');
+            historyStr += `\n- ${roleStr}: ${m.content}`;
+          });
+          threadContext = `[THREAD CONTEXT: You were originally having a conversation with another user (ID: ${originalUserId}) in this thread. Here is that conversation history:${historyStr}\nNow, a 3rd person (${username}, ID: ${userId}) has replied to your message, jumping into the conversation. Keep the context of what you were talking about with the original user in mind, but address ${username} and reply to their message directly. Do not start a completely new context if it fits the flow.]`;
+        }
+      }
+    } catch (err) {
+      console.error('Error tracing thread context:', err);
+    }
   }
 
   // 8. Crisis Guardrail: Check after mention/reply/chaos checks pass
@@ -986,6 +1281,12 @@ client.on('messageCreate', async (message) => {
       });
       roomContextStr += "\nUse this room context only for general awareness. Address the user specifically and reply using your 1-on-1 history below.]";
 
+      if (threadContext) {
+        formattedMessages.unshift({
+          role: 'system',
+          content: threadContext
+        });
+      }
       formattedMessages.unshift({
         role: 'system',
         content: roomContextStr
@@ -1063,6 +1364,12 @@ client.on('messageCreate', async (message) => {
       });
       roomContextStr += "\nUse this room context only for general awareness. Address the user specifically and reply using your 1-on-1 history below.]";
 
+      if (threadContext) {
+        formattedMessages.unshift({
+          role: 'system',
+          content: threadContext
+        });
+      }
       formattedMessages.unshift({
         role: 'system',
         content: roomContextStr
@@ -1201,13 +1508,7 @@ client.on('interactionCreate', async (interaction) => {
      (interaction.member.permissions.has(PermissionFlagsBits.ManageMessages) || 
       interaction.member.permissions.has(PermissionFlagsBits.Administrator)));
 
-  // Gate: owner command is hidden in Discord UI, but if someone somehow triggers it, silently ignore
-  if (commandName === 'owner' && !isOwner) {
-    return interaction.reply({
-      content: "❌",
-      ephemeral: true
-    });
-  }
+
 
   if (commandName === 'admin' && !isAdmin) {
     return interaction.reply({
@@ -1223,20 +1524,20 @@ client.on('interactionCreate', async (interaction) => {
     if (commandName === 'info') {
       let infoMsg = "";
       if (isOwner) {
-        infoMsg = `👑 **LILGOONER OWNER INFO**\n` +
-          `- **/owner banish/unbanish [user]**: Roast target hard.\n` +
-          `- **/owner bless/unbless [user]**: Glaze target.\n` +
-          `- **/owner config [setting] [value]**: Adjust settings (toxicity, slang, emoji) or reset config.\n` +
-          `- **/owner ghost/unghost [user]**: Make bot ignore user completely (silent ignore).\n` +
-          `- **/owner puppet/unpuppet [user]**: Make bot agree with user sarcastically.\n` +
-          `- **/owner chaos [active] [duration]**: Bot randomly roasts people (~15% chance).\n` +
-          `- **/owner nickname [user] [name]**: Call target a custom name.\n` +
-          `- **/owner brainrot [active]**: Toggle bot-wide brainrot speech mode.\n` +
-          `- **/owner nsfw [user] [duration]**: Enable unfiltered NSFW roleplay for a user.\n` +
-          `- **/owner unsfw [user]**: Disable NSFW roleplay for a user.\n` +
-          `- **/owner announce [message]**: Make a dramatic announcement.\n` +
-          `- **/owner impersonate [content]**: Speak as bot.\n` +
-          `- **/owner vibecheck**: Trigger server vibecheck.\n\n` +
+        infoMsg = `👑 **LILGOONER OWNER INFO** (Prefix normal messages with !owner)\n` +
+          `- **!owner banish/unbanish [user] [duration_mins]**: Roast target hard.\n` +
+          `- **!owner bless/unbless [user] [duration_mins]**: Glaze target.\n` +
+          `- **!owner config [setting] [value]**: Adjust personality (toxicity_level, slang_intensity, emoji_frequency, reset_all).\n` +
+          `- **!owner ghost/unghost [user] [duration_mins]**: Make bot ignore user completely.\n` +
+          `- **!owner puppet/unpuppet [user] [duration_mins]**: Make bot agree with user sarcastically.\n` +
+          `- **!owner chaos [active: true/false] [duration_mins]**: Toggle random roasts.\n` +
+          `- **!owner nickname [user] [name/clear]**: Set custom name for user.\n` +
+          `- **!owner brainrot [active: true/false]**: Toggle bot-wide brainrot speak mode.\n` +
+          `- **!owner nsfw [user] [duration_mins]**: Enable OpenRouter NSFW roleplay.\n` +
+          `- **!owner unsfw [user]**: Disable NSFW roleplay.\n` +
+          `- **!owner announce [message]**: Make owner announcement.\n` +
+          `- **!owner impersonate [content]**: Speak as bot.\n` +
+          `- **!owner vibecheck**: Trigger server vibecheck.\n\n` +
           `⚙️ **ADMIN COMMANDS**:\n` +
           `- **/admin status**: View configurations and active timers.\n` +
           `- **/admin mute/unmute [user]**: Block user from getting replies.\n` +
@@ -1596,272 +1897,7 @@ client.on('interactionCreate', async (interaction) => {
       }
     }
 
-    // ----------------------------------------------------
-    // OWNER Commands
-    // ----------------------------------------------------
-    if (commandName === 'owner') {
-      const subcommand = interaction.options.getSubcommand();
-      
-      switch (subcommand) {
-        case 'banish': {
-          const targetUser = interaction.options.getUser('user');
-          const duration = interaction.options.getInteger('duration') || 60;
-          await db.setBanishBlessStatus(targetUser.id, 'banished', duration);
-          return interaction.reply({
-            content: `banished <@${targetUser.id}> for the next ${duration} minutes. they are cooked fr 💀`,
-            ephemeral: true
-          });
-        }
 
-        case 'unbanish': {
-          const targetUser = interaction.options.getUser('user');
-          await db.setBanishBlessStatus(targetUser.id, null, 0);
-          return interaction.reply({
-            content: `lifted banishment for <@${targetUser.id}>. they are off the hook 🗿`,
-            ephemeral: true
-          });
-        }
-
-        case 'bless': {
-          const targetUser = interaction.options.getUser('user');
-          const duration = interaction.options.getInteger('duration') || 60;
-          await db.setBanishBlessStatus(targetUser.id, 'blessed', duration);
-          return interaction.reply({
-            content: `<@${targetUser.id}> has been blessed for the next ${duration} minutes. they get the glaze treatment now 🥺`,
-            ephemeral: true
-          });
-        }
-
-        case 'unbless': {
-          const targetUser = interaction.options.getUser('user');
-          await db.setBanishBlessStatus(targetUser.id, null, 0);
-          return interaction.reply({
-            content: `lifted blessing for <@${targetUser.id}>. no more free glaze 🥱`,
-            ephemeral: true
-          });
-        }
-
-        case 'config': {
-          const setting = interaction.options.getString('setting');
-          const val = interaction.options.getString('value');
-          
-          if (setting === 'reset_all') {
-            await db.resetPersonalityConfig(guildId);
-            tempToxicitySettings.delete(guildId);
-            return interaction.reply({ content: `personality configurations have been reset to normal defaults! ⚙️`, ephemeral: true });
-          }
-
-          if (!val) {
-            return interaction.reply({ content: `you must provide a value to modify this setting 💀`, ephemeral: true });
-          }
-          
-          if (setting === 'toxicity_level') {
-            const valStr = val.toLowerCase();
-            if (valStr.includes('hour') || valStr.includes('feral') || valStr.includes('bit') || valStr.includes('nice')) {
-              if (valStr.includes('feral') || valStr.includes('10')) {
-                tempToxicitySettings.set(guildId, { override: 10, expires: Date.now() + 60 * 60 * 1000 });
-                return interaction.reply({ content: "fine, i'll go feral and roast everyone for the next hour 💀🔥", ephemeral: true });
-              } else if (valStr.includes('nice') || valStr.includes('1') || valStr.includes('0')) {
-                tempToxicitySettings.set(guildId, { override: 1, expires: Date.now() + 30 * 60 * 1000 });
-                return interaction.reply({ content: "ugh, fine. i will be nice for 30 minutes. don't get used to it 🙄", ephemeral: true });
-              }
-            } else {
-              const num = parseInt(val, 10);
-              if (!isNaN(num)) {
-                const clamped = Math.max(0, Math.min(10, num));
-                await db.updatePersonalityConfig(guildId, { toxicity_level: clamped });
-                return interaction.reply({ content: `toxicity level updated to ${clamped} bot-wide 🗿`, ephemeral: true });
-              }
-            }
-          } else if (setting === 'slang_intensity') {
-            const num = parseInt(val, 10);
-            if (!isNaN(num)) {
-              const clamped = Math.max(0, Math.min(10, num));
-              await db.updatePersonalityConfig(guildId, { slang_intensity: clamped });
-              return interaction.reply({ content: `slang intensity updated to ${clamped} 🗣️`, ephemeral: true });
-            }
-          } else if (setting === 'emoji_frequency') {
-            const num = parseInt(val, 10);
-            if (!isNaN(num)) {
-              const clamped = Math.max(0, Math.min(10, num));
-              await db.updatePersonalityConfig(guildId, { emoji_frequency: clamped });
-              return interaction.reply({ content: `emoji frequency updated to ${clamped} 💀`, ephemeral: true });
-            }
-          }
-          return interaction.reply({ content: `invalid value or configuration settings 💀`, ephemeral: true });
-        }
-
-        case 'impersonate': {
-          const content = interaction.options.getString('content');
-          const channel = interaction.channel;
-          await channel.send(content);
-          return interaction.reply({
-            content: `sent impersonation message: "${content}"`,
-            ephemeral: true
-          });
-        }
-
-        case 'vibecheck': {
-          const channel = interaction.channel;
-          const vMsg = await channel.send("🚨 **SERVER VIBE CHECK TIME** 🚨\nReact to this message with any emoji in the next 30 seconds to get your aura rated and roasted! Do it or you're mid 💀");
-          const filter = (reaction, user) => !user.bot;
-          const collector = vMsg.createReactionCollector({ filter, time: 30000 });
-          const reactedUsers = new Set();
-
-          collector.on('collect', async (reaction, user) => {
-            if (reactedUsers.has(user.id)) return;
-            reactedUsers.add(user.id);
-            
-            const userAura = await db.getAuraPoints(user.id);
-            const promptText = `Generate a 1-sentence savage roast or funny compliment for user ${user.username} (Aura points: ${userAura}) who reacted to our server vibe check.`;
-            try {
-              const response = await groq.queryGroq(
-                [{ role: 'user', content: promptText }],
-                false,
-                await db.getPersonalityConfig(guildId),
-                user.username,
-                user.id,
-                await db.getBanishBlessStatus(user.id),
-                false
-              );
-              await vMsg.reply(`<@${user.id}>: ${response.content}`);
-            } catch (err) {
-              console.error(err);
-            }
-          });
-
-          collector.on('end', () => {
-            vMsg.reply("vibe check closed. thanks for yapping 💀");
-          });
-
-          return interaction.reply({
-            content: "started server vibe check!",
-            ephemeral: true
-          });
-        }
-
-        case 'ghost': {
-          const targetUser = interaction.options.getUser('user');
-          const duration = interaction.options.getInteger('duration') || 60;
-          ghostedUsers.set(`${guildId}-${targetUser.id}`, Date.now() + duration * 60 * 1000);
-          return interaction.reply({
-            content: `ghosted <@${targetUser.id}> for ${duration} minutes. bot is ignoring them completely. 😶`,
-            ephemeral: true
-          });
-        }
-
-        case 'unghost': {
-          const targetUser = interaction.options.getUser('user');
-          ghostedUsers.delete(`${guildId}-${targetUser.id}`);
-          return interaction.reply({
-            content: `unghosted <@${targetUser.id}>. bot will respond to them again.`,
-            ephemeral: true
-          });
-        }
-
-        case 'puppet': {
-          const targetUser = interaction.options.getUser('user');
-          const duration = interaction.options.getInteger('duration') || 60;
-          puppetedUsers.set(`${guildId}-${targetUser.id}`, Date.now() + duration * 60 * 1000);
-          return interaction.reply({
-            content: `puppeted <@${targetUser.id}> for ${duration} minutes. bot will agree with everything they say sarcastically. 🧸`,
-            ephemeral: true
-          });
-        }
-
-        case 'unpuppet': {
-          const targetUser = interaction.options.getUser('user');
-          puppetedUsers.delete(`${guildId}-${targetUser.id}`);
-          return interaction.reply({
-            content: `unpuppeted <@${targetUser.id}>. bot will act normally with them now.`,
-            ephemeral: true
-          });
-        }
-
-        case 'chaos': {
-          const active = interaction.options.getBoolean('active');
-          const duration = interaction.options.getInteger('duration') || 60;
-          if (!active) {
-            chaosMode.delete(guildId);
-            return interaction.reply({ content: "chaos mode disabled fr. bot will behave.", ephemeral: true });
-          }
-          chaosMode.set(guildId, Date.now() + duration * 60 * 1000);
-          return interaction.reply({
-            content: `chaos mode enabled for ${duration} minutes. bot will randomly roast people in this server 😈`,
-            ephemeral: true
-          });
-        }
-
-        case 'nickname': {
-          const targetUser = interaction.options.getUser('user');
-          const name = interaction.options.getString('name');
-          if (name.toLowerCase() === 'clear') {
-            await db.removeNickname(targetUser.id);
-            return interaction.reply({ content: `cleared nickname override for <@${targetUser.id}>.`, ephemeral: true });
-          }
-          await db.setNickname(targetUser.id, name);
-          return interaction.reply({ content: `set nickname override for <@${targetUser.id}> to "${name}".`, ephemeral: true });
-        }
-
-        case 'announce': {
-          const messageContent = interaction.options.getString('message');
-          const channel = interaction.channel;
-          await channel.send(`📢 **ANNOUNCEMENT FROM THE OWNER** 📢\n\n${messageContent}\n\n*respect the authority fr 💀*`);
-          return interaction.reply({ content: "announcement sent!", ephemeral: true });
-        }
-
-        case 'brainrot': {
-          const active = interaction.options.getBoolean('active');
-          brainrotMode.set(guildId, active);
-          return interaction.reply({
-            content: `brainrot mode is now **${active ? 'ENABLED' : 'DISABLED'}** server-wide. ${active ? 'skibidi time 💀' : 'back to normal casual yapping.'}`,
-            ephemeral: true
-          });
-        }
-
-        case 'nsfw': {
-          const targetUser = interaction.options.getUser('user');
-          const duration = interaction.options.getInteger('duration');
-          
-          await db.setNsfwAccess(guildId, targetUser.id, duration);
-
-          if (duration) {
-            return interaction.reply({
-              content: `NSFW unrestricted mode enabled for <@${targetUser.id}> for the next ${duration} minutes. 😈`,
-              ephemeral: true
-            });
-          } else {
-            return interaction.reply({
-              content: `NSFW unrestricted mode enabled permanently for <@${targetUser.id}>. 😈`,
-              ephemeral: true
-            });
-          }
-        }
-
-        case 'unsfw': {
-          const targetUser = interaction.options.getUser('user');
-          
-          await db.removeNsfwAccess(guildId, targetUser.id);
-          const nsfwConvKey = `${interaction.channel.id}-${targetUser.id}`;
-          nsfwConversations.delete(nsfwConvKey);
-
-          return interaction.reply({
-            content: `NSFW unrestricted mode removed for <@${targetUser.id}>.`,
-            ephemeral: true
-          });
-        }
-
-        case 'mood': {
-          const mood = interaction.options.getString('mood');
-          const duration = interaction.options.getInteger('duration') || 60;
-          await db.setServerMood(guildId, mood, duration);
-          return interaction.reply({
-            content: `server mood set to **${mood.toUpperCase()}** for the next ${duration} minutes. let's see how i feel about this 🙄`,
-            ephemeral: true
-          });
-        }
-      }
-    }
   } catch (error) {
     console.error('Interaction error:', error);
     try {
