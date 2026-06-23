@@ -7,8 +7,9 @@ let db = null;
 async function initDb() {
   if (db) return db;
 
+  const dbFilename = process.env.DATABASE_PATH || path.join(__dirname, 'lilgooner.db');
   db = await open({
-    filename: path.join(__dirname, 'lilgooner.db'),
+    filename: dbFilename,
     driver: sqlite3.Database
   });
 
