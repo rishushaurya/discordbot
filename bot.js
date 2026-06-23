@@ -49,10 +49,13 @@ const ghostedUsers = new Map();    // Key: "guildId-userId", Value: expiresAt ti
 const puppetedUsers = new Map();   // Key: "guildId-userId", Value: expiresAt timestamp
 const chaosMode = new Map();       // Key: guildId, Value: expiresAt timestamp
 const brainrotMode = new Map();    // Key: guildId, Value: boolean
+const princessMode = new Map();    // Key: guildId, Value: boolean
+const ownerLimiter = new Map();    // Key: userId, Value: Array of timestamps
 
 // Admin commands state
 const mutedUsers = new Map();      // Key: "guildId-userId", Value: expiresAt timestamp
 const adminSlowmode = new Map();   // Key: guildId, Value: { cooldownMs, expiresAt }
+const lockdownMode = new Map();    // Key: guildId, Value: expiresAt timestamp
 
 // Global Groq Rate Limiter (Max 20 requests per minute)
 const groqCallTimestamps = [];
@@ -155,6 +158,22 @@ async function registerSlashCommands() {
           .addIntegerOption(opt => opt.setName('seconds').setDescription('Cooldown in seconds (0 to disable)').setRequired(true))
           .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes (default 60)').setRequired(false))
       )
+      .addSubcommand(sub =>
+        sub.setName('warn')
+          .setDescription('Issue a formal warning to a user, deducting aura points')
+          .addUserOption(opt => opt.setName('user').setDescription('User to warn').setRequired(true))
+          .addStringOption(opt => opt.setName('reason').setDescription('Reason for warning').setRequired(true))
+      )
+      .addSubcommand(sub =>
+        sub.setName('lockdown')
+          .setDescription('Lock the bot to admin-only interaction')
+          .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes (default 10)').setRequired(false))
+      )
+      .addSubcommand(sub =>
+        sub.setName('poll')
+          .setDescription('Start a quick 60-second reaction poll')
+          .addStringOption(opt => opt.setName('question').setDescription('Poll question').setRequired(true))
+      )
       .toJSON()
   ];
 
@@ -190,6 +209,40 @@ function checkCrisisTriggers(content) {
 // Helper: Send supportive response
 async function handleCrisisResponse(message) {
   await message.reply("Hey, I know I'm usually sarcastic, but please know that you're not alone. If you're going through a tough time, please reach out to someone who can help or contact a crisis hotline (like dialing 988 in the US/Canada, or visiting https://findahelpline.com/). There are people who care and want to support you.");
+}
+
+// Helper: Sanitize message to prevent prompt injection attacks
+function sanitizeForPrompt(text) {
+  if (!text) return '';
+  let sanitized = text;
+  const dangerousPatterns = [
+    /^\s*system:/i,
+    /^\s*\[system/i,
+    /^\s*you are/i,
+    /^\s*ignore previous/i,
+    /^\s*new instructions/i,
+    /^\s*forget everything/i,
+    /assistant:/i,
+    /user:/i,
+    /system:/i
+  ];
+  
+  const lines = sanitized.split('\n');
+  const cleanLines = lines.map(line => {
+    let cleanLine = line;
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(cleanLine)) {
+        if (pattern.source.startsWith('^')) {
+          return '';
+        } else {
+          cleanLine = cleanLine.replace(pattern, '');
+        }
+      }
+    }
+    return cleanLine;
+  });
+  
+  return cleanLines.filter(line => line.trim().length > 0).join('\n');
 }
 
 // Helper: Track last 25 messages per channel
@@ -693,10 +746,36 @@ client.on('messageCreate', async (message) => {
 
   // Intercept Owner Prefix Commands
   if (message.content.startsWith('!owner') && userId === OWNER_DISCORD_ID) {
+    // Owner command rate limiter
+    const limiterNow = Date.now();
+    if (!ownerLimiter.has(userId)) {
+      ownerLimiter.set(userId, []);
+    }
+    const timestamps = ownerLimiter.get(userId);
+    const recentTimestamps = timestamps.filter(t => t > limiterNow - 60000);
+    if (recentTimestamps.length >= 10) {
+      await sendEphemeralReply(message, `Chill out lamey, you're rate limited! Max 10 commands per minute. 💀`);
+      return;
+    }
+    recentTimestamps.push(limiterNow);
+    ownerLimiter.set(userId, recentTimestamps);
+
     const args = message.content.split(/\s+/).slice(1);
     const subcommand = args[0] ? args[0].toLowerCase() : '';
 
     switch (subcommand) {
+      case 'princess': {
+        const val = args[1] ? args[1].toLowerCase() : '';
+        if (val === 'on' || val === 'true' || val === '1') {
+          princessMode.set(guildId, true);
+          await sendEphemeralReply(message, `🎀 yay~ princess mode is now enabled, bestie! teehee 🎀`);
+        } else {
+          princessMode.set(guildId, false);
+          await sendEphemeralReply(message, `sigh... princess mode disabled. back to normal casualty 🙄`);
+        }
+        return;
+      }
+
       case 'banish': {
         const targetStr = args[1];
         const duration = parseInt(args[2], 10) || 60;
@@ -802,22 +881,30 @@ client.on('messageCreate', async (message) => {
       }
 
       case 'impersonate': {
-        const content = args.slice(1).join(' ');
-        if (!content) {
+        if (userId !== OWNER_DISCORD_ID) return;
+        const rawContent = args.slice(1).join(' ');
+        if (!rawContent) {
           await sendEphemeralReply(message, `what do you want me to say? 💀`);
           return;
         }
+        const content = rawContent.replace(/@everyone/g, 'everyone').replace(/@here/g, 'here');
         try {
           if (message.deletable) await message.delete();
         } catch (e) {}
         await message.channel.send(content);
-        
-        const confirmMsg = await message.channel.send(`sent impersonation message: "${content}"`);
-        setTimeout(async () => {
-          try {
-            await confirmMsg.delete();
-          } catch (e) {}
-        }, 5000);
+        console.log(`[AUDIT LOG] [${new Date().toISOString()}] Owner impersonation in channel #${message.channel.name} (${message.channel.id}): "${content}"`);
+        const confirmText = `Sent impersonation message in #${message.channel.name}: "${content}"`;
+        try {
+          const dmChannel = await message.author.createDM();
+          await dmChannel.send(confirmText);
+        } catch (dmErr) {
+          const confirmMsg = await message.channel.send(confirmText);
+          setTimeout(async () => {
+            try {
+              await confirmMsg.delete();
+            } catch (e) {}
+          }, 2000);
+        }
         return;
       }
 
@@ -837,6 +924,7 @@ client.on('messageCreate', async (message) => {
           const userAura = await db.getAuraPoints(user.id);
           const promptText = `Generate a 1-sentence savage roast or funny compliment for user ${user.username} (Aura points: ${userAura}) who reacted to our server vibe check.`;
           try {
+            const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
             const response = await groq.queryGroq(
               [{ role: 'user', content: promptText }],
               false,
@@ -844,7 +932,12 @@ client.on('messageCreate', async (message) => {
               user.username,
               user.id,
               await db.getBanishBlessStatus(user.id),
-              false
+              false,
+              null,
+              false,
+              false,
+              null,
+              isPrincess
             );
             await vMsg.reply(`<@${user.id}>: ${response.content}`);
           } catch (err) {
@@ -962,7 +1055,25 @@ client.on('messageCreate', async (message) => {
         try {
           if (message.deletable) await message.delete();
         } catch (e) {}
-        await message.channel.send(`📢 **ANNOUNCEMENT FROM THE OWNER** 📢\n\n${messageContent}\n\n*respect the authority fr 💀*`);
+
+        const lowerContent = messageContent.toLowerCase();
+        let announcementText = '';
+
+        if (['warning', 'important', 'urgent', 'alert', 'breaking', 'attention'].some(k => lowerContent.includes(k))) {
+          announcementText = `🚨⚠️ **URGENT ALERT FROM THE OWNER** ⚠️🚨\n\n${messageContent}\n\n🚨 *attention required immediately!* 🚨`;
+        } else if (['event', 'party', 'celebrating', 'giveaway', 'tournament', 'contest'].some(k => lowerContent.includes(k))) {
+          announcementText = `🎉🎊 **EVENT ANNOUNCEMENT** 🎊🎉\n\n${messageContent}\n\n🥳 *let's fucking go!* 🥳`;
+        } else if (['bruh', 'lmao', '💀', 'fr', 'ngl', 'shitpost', 'meme'].some(k => lowerContent.includes(k))) {
+          announcementText = `💀🗿 **OWNER SHITPOST TIME** 🗿💀\n\n${messageContent}\n\n💀 *literally unhinged behaviour fr* 💀`;
+        } else if (['love', 'thank', 'appreciate', 'proud', 'congrats', 'welcome'].some(k => lowerContent.includes(k))) {
+          announcementText = `🥺💕 **WHOLESOME OWNER ANNOUNCEMENT** 💕✨\n\n${messageContent}\n\n🥰 *much love besties!* 🥰`;
+        } else if (['ban', 'rule', 'punish', 'consequence', 'behave', 'last chance'].some(k => lowerContent.includes(k))) {
+          announcementText = `😈⚡ **MENACING NOTICE FROM THE OWNER** ⚡😈\n\n${messageContent}\n\n😈 *consider this your final warning.* 😈`;
+        } else {
+          announcementText = `📢 **ANNOUNCEMENT FROM THE OWNER** 📢\n\n${messageContent}\n\n*respect the authority fr 💀*`;
+        }
+
+        await message.channel.send(announcementText);
         
         const confirmMsg = await message.channel.send("announcement sent!");
         setTimeout(async () => {
@@ -1048,6 +1159,21 @@ client.on('messageCreate', async (message) => {
     }
   }
 
+  // 3b. Lockdown Check (Admin Power) - Bot completely stops responding to non-admins
+  if (lockdownMode.has(guildId)) {
+    const expiresAt = lockdownMode.get(guildId);
+    if (Date.now() < expiresAt) {
+      const member = message.member;
+      const isOwner = userId === OWNER_DISCORD_ID;
+      const isAdmin = isOwner || (member && (member.permissions.has(PermissionFlagsBits.ManageMessages) || member.permissions.has(PermissionFlagsBits.Administrator)));
+      if (!isAdmin) {
+        return; // silently ignore
+      }
+    } else {
+      lockdownMode.delete(guildId);
+    }
+  }
+
   // 4. Mute Check (Admin Power) - Silently ignore
   if (mutedUsers.has(`${guildId}-${userId}`)) {
     const expiresAt = mutedUsers.get(`${guildId}-${userId}`);
@@ -1069,8 +1195,14 @@ client.on('messageCreate', async (message) => {
     cleanContent = cleanContent.substring(0, 1000) + '...';
   }
 
+  // Apply prompt injection sanitizer
+  let sanitizedContent = sanitizeForPrompt(cleanContent);
+  if (!sanitizedContent.trim()) {
+    sanitizedContent = "...";
+  }
+
   // 5. Always log messages to channel context for general room awareness
-  updateChannelLog(message, cleanContent);
+  updateChannelLog(message, sanitizedContent);
 
   // 6. Handle Message Cooldown (supports custom Admin slowmode)
   const now = Date.now();
@@ -1241,9 +1373,11 @@ client.on('messageCreate', async (message) => {
 
     let replyText = '';
 
+    const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
+
     if (isNsfw) {
       // NSFW OpenRouter mode
-      updateUserConversationNsfw(message.channel.id, userId, 'user', cleanContent, username);
+      updateUserConversationNsfw(message.channel.id, userId, 'user', sanitizedContent, username);
 
       const userConvKey = `${message.channel.id}-${userId}`;
       const userHistory = nsfwConversations.get(userConvKey) || [];
@@ -1300,7 +1434,8 @@ client.on('messageCreate', async (message) => {
         guildConfig,
         nickname,
         senderStatus,
-        serverMood
+        serverMood,
+        isPrincess
       );
 
       replyText = orResponse.content || '';
@@ -1327,7 +1462,7 @@ client.on('messageCreate', async (message) => {
       }
     } else {
       // Normal Groq mode
-      updateUserConversation(message.channel.id, userId, 'user', cleanContent, username);
+      updateUserConversation(message.channel.id, userId, 'user', sanitizedContent, username);
 
       const userConvKey = `${message.channel.id}-${userId}`;
       const userHistory = userConversations.get(userConvKey) || [];
@@ -1375,7 +1510,7 @@ client.on('messageCreate', async (message) => {
         content: roomContextStr
       });
 
-      const useTools = detectToolKeywords(cleanContent);
+      const useTools = detectToolKeywords(sanitizedContent);
 
       let groqResponse = await groq.queryGroq(
         formattedMessages,
@@ -1388,7 +1523,8 @@ client.on('messageCreate', async (message) => {
         nickname,
         isPuppeted,
         isBrainrot,
-        serverMood
+        serverMood,
+        isPrincess
       );
 
       // Handle Tool Calls
@@ -1454,7 +1590,8 @@ client.on('messageCreate', async (message) => {
           nickname,
           isPuppeted,
           isBrainrot,
-          serverMood
+          serverMood,
+          isPrincess
         );
       }
 
@@ -1525,6 +1662,7 @@ client.on('interactionCreate', async (interaction) => {
       let infoMsg = "";
       if (isOwner) {
         infoMsg = `👑 **LILGOONER OWNER INFO** (Prefix normal messages with !owner)\n` +
+          `- **!owner princess [on/off]**: Toggle ultra cute princess mode server-wide.\n` +
           `- **!owner banish/unbanish [user] [duration_mins]**: Roast target hard.\n` +
           `- **!owner bless/unbless [user] [duration_mins]**: Glaze target.\n` +
           `- **!owner config [setting] [value]**: Adjust personality (toxicity_level, slang_intensity, emoji_frequency, reset_all).\n` +
@@ -1540,26 +1678,35 @@ client.on('interactionCreate', async (interaction) => {
           `- **!owner vibecheck**: Trigger server vibecheck.\n\n` +
           `⚙️ **ADMIN COMMANDS**:\n` +
           `- **/admin status**: View configurations and active timers.\n` +
+          `- **/admin warn [user] [reason]**: Public warning with aura penalty.\n` +
+          `- **/admin lockdown [duration_mins]**: Lock bot to admin-only temporarily.\n` +
+          `- **/admin poll [question]**: Quick 60-second reaction poll.\n` +
           `- **/admin mute/unmute [user]**: Block user from getting replies.\n` +
           `- **/admin slowmode [seconds]**: Set bot cooldown.\n` +
           `- **/admin vibecheck**: Start vibe check.\n\n` +
           `🟢 **MEMBER COMMANDS**:\n` +
-          `- **/roastme**, **/fortune**, **/sus [user]**, **/battle [user]**, **/fakequote [user]**`;
+          `- **/roastme**, **/fortune**, **/sus [user]**, **/battle [user]**, **/fakequote [user]**, **/dare**, **/confess**, **/ratio**`;
       } else if (isAdmin) {
         infoMsg = `⚙️ **LILGOONER ADMIN INFO**\n` +
           `- **/admin status**: View configurations and active timers.\n` +
+          `- **/admin warn [user] [reason]**: Public warning with aura penalty.\n` +
+          `- **/admin lockdown [duration_mins]**: Lock bot to admin-only temporarily.\n` +
+          `- **/admin poll [question]**: Quick 60-second reaction poll.\n` +
           `- **/admin mute/unmute [user]**: Block user from getting replies.\n` +
           `- **/admin slowmode [seconds]**: Set bot cooldown.\n` +
           `- **/admin vibecheck**: Start vibe check.\n\n` +
           `🟢 **MEMBER COMMANDS**:\n` +
-          `- **/roastme**, **/fortune**, **/sus [user]**, **/battle [user]**, **/fakequote [user]**`;
+          `- **/roastme**, **/fortune**, **/sus [user]**, **/battle [user]**, **/fakequote [user]**, **/dare**, **/confess**, **/ratio**`;
       } else {
         infoMsg = `🟢 **LILGOONER MEMBER COMMANDS**\n` +
           `- **/roastme**: Ask the bot to roast you.\n` +
           `- **/fortune**: Get a Gen-Z brainrot prediction.\n` +
           `- **/sus [user]**: Rate sus level of a user.\n` +
           `- **/battle [user]**: Start a mock rap battle with someone.\n` +
-          `- **/fakequote [user]**: Generate a fake quote attributed to a user.`;
+          `- **/fakequote [user]**: Generate a fake quote attributed to a user.\n` +
+          `- **/dare**: Get a Gen-Z brainrot dare challenge.\n` +
+          `- **/confess**: Submit an anonymous confession.\n` +
+          `- **/ratio**: Attempt to ratio someone.`;
       }
 
       return interaction.reply({ content: infoMsg, ephemeral: true });
@@ -1570,7 +1717,15 @@ client.on('interactionCreate', async (interaction) => {
     // ----------------------------------------------------
     if (commandName === 'roastme') {
       await interaction.deferReply();
-      const promptText = `Generate a savage, hilarious, and short (1 sentence) roast targeting the user ${user.username}. Make it Gen-Z styled and cringe/sarcastic.`;
+      const channelMsgs = await interaction.channel.messages.fetch({ limit: 50 });
+      const targetMsgs = channelMsgs.filter(m => m.author.id === user.id && !m.author.bot).toJSON().slice(0, 10).map(m => m.content).filter(Boolean);
+      const userAura = await db.getAuraPoints(user.id);
+      const msgsContext = targetMsgs.length > 0 ? targetMsgs.join(' | ') : "No recent messages";
+
+      const promptText = `Generate a savage, hilarious, and short (1 sentence) roast targeting the user ${user.username} (Aura points: ${userAura}). 
+      Use their recent messages in this channel to make the roast personal and reference what they said: "${msgsContext}". Make it Gen-Z styled and cringe/sarcastic.`;
+      
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1578,7 +1733,12 @@ client.on('interactionCreate', async (interaction) => {
         user.username,
         user.id,
         await db.getBanishBlessStatus(user.id),
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
       return interaction.editReply(`<@${user.id}>: ${response.content}`);
     }
@@ -1588,6 +1748,8 @@ client.on('interactionCreate', async (interaction) => {
       const categories = ['🎮 Gaming', '💀 Cursed', '💕 Rizz', '🧠 Sigma'];
       const cat = categories[Math.floor(Math.random() * categories.length)];
       const promptText = `Generate a funny, cringe, slang-filled Gen-Z fortune cookie prediction (1 sentence) for user ${user.username} based on the category "${cat}".`;
+      
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1595,7 +1757,12 @@ client.on('interactionCreate', async (interaction) => {
         user.username,
         user.id,
         await db.getBanishBlessStatus(user.id),
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
       return interaction.editReply(`🔮 **Fortune Category**: **${cat}**\n🔮 **Prediction for <@${user.id}>**: ${response.content}`);
     }
@@ -1603,19 +1770,28 @@ client.on('interactionCreate', async (interaction) => {
     if (commandName === 'sus') {
       await interaction.deferReply();
       const targetUser = interaction.options.getUser('user');
-      const pct = Math.floor(Math.random() * 101);
       
-      const fakeEvidences = [
-        "Caught venting in cafeteria",
-        "Mewing during the team meeting",
-        "Listening to nightcore version of skibidi toilet at 3 AM",
-        "Having a secret folder of minion memes",
-        "Sus behavior detected in general chat",
-        "Refusing to double-check their code in prod"
-      ];
-      const evidence = fakeEvidences[Math.floor(Math.random() * fakeEvidences.length)];
+      const channelMsgs = await interaction.channel.messages.fetch({ limit: 100 });
+      const targetMsgs = channelMsgs
+        .filter(m => m.author.id === targetUser.id && !m.author.bot)
+        .toJSON()
+        .slice(0, 15);
+      const targetAura = await db.getAuraPoints(targetUser.id);
+      
+      let pct = 50;
+      pct += Math.max(-30, Math.min(30, Math.floor((500 - targetAura) / 10)));
+      pct += targetMsgs.length * 2;
+      pct += Math.floor(Math.random() * 20) - 10;
+      pct = Math.max(0, Math.min(100, pct));
+      
+      const msgContents = targetMsgs.map(m => m.content).filter(Boolean);
+      const msgsContext = msgContents.length > 0 
+        ? `Here are some of their recent messages in this channel to use as real evidence:\n${msgContents.map((m, idx) => `[${idx+1}]: "${m}"`).join('\n')}`
+        : "They have no recent messages in this channel.";
 
-      const promptText = `Generate a short (1 sentence) hilarious explanation of why user ${targetUser.username} was rated ${pct}% sus (suspicious/imposter) because of: "${evidence}". Make it extremely Gen-Z and sarcastic.`;
+      const promptText = `Generate a short (1 sentence) hilarious explanation of why user ${targetUser.username} was rated ${pct}% sus (suspicious/imposter) using the following real evidence: ${msgsContext}. Make it extremely Gen-Z and sarcastic, referring directly to things they said if possible.`;
+      
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1623,11 +1799,26 @@ client.on('interactionCreate', async (interaction) => {
         targetUser.username,
         targetUser.id,
         await db.getBanishBlessStatus(targetUser.id),
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
+
+      let auraFeedback = "";
+      if (pct < 30) {
+        await db.adjustAuraPoints(targetUser.id, 10);
+        auraFeedback = "\n😇 *Awarded +10 aura points for being low sus!*";
+      } else if (pct > 70) {
+        await db.adjustAuraPoints(targetUser.id, -10);
+        auraFeedback = "\n😡 *Deducted 10 aura points for high sus behavior!*";
+      }
+
       return interaction.editReply(`🔎 **Sus Meter for <@${targetUser.id}>**: **${pct}%**\n` +
-        `🚨 **Evidence**: *${evidence}*\n` +
-        `💬 **Verdict**: "${response.content}"`);
+        `🚨 **Evidence**: *Real message history and aura levels checked.*\n` +
+        `💬 **Verdict**: "${response.content}"${auraFeedback}`);
     }
 
     if (commandName === 'battle') {
@@ -1636,7 +1827,27 @@ client.on('interactionCreate', async (interaction) => {
       if (targetUser.id === user.id) {
         return interaction.editReply("you can't roast battle yourself NPC 💀");
       }
-      const promptText = `Generate a quick 3-round roast battle between ${user.username} and ${targetUser.username}. For each round, write a 1-line roast from each person (6 lines total). Format it as:\nRound 1: [user1 roast], [user2 roast]\nRound 2: [user1 roast], [user2 roast]\nRound 3: [user1 roast], [user2 roast]\nKeep it extremely Gen-Z, funny, and brainrotted.`;
+      
+      const channelMsgs = await interaction.channel.messages.fetch({ limit: 100 });
+      const userMsgs = channelMsgs.filter(m => m.author.id === user.id && !m.author.bot).toJSON().slice(0, 10).map(m => m.content).filter(Boolean);
+      const targetMsgs = channelMsgs.filter(m => m.author.id === targetUser.id && !m.author.bot).toJSON().slice(0, 10).map(m => m.content).filter(Boolean);
+      const userAura = await db.getAuraPoints(user.id);
+      const targetAura = await db.getAuraPoints(targetUser.id);
+      
+      const userContext = userMsgs.length > 0 ? userMsgs.join(' | ') : "No recent messages";
+      const targetContext = targetMsgs.length > 0 ? targetMsgs.join(' | ') : "No recent messages";
+
+      const promptText = `Generate a quick 3-round roast battle between ${user.username} (Aura: ${userAura}) and ${targetUser.username} (Aura: ${targetAura}). 
+      Use their actual recent messages to personalize the roasts:
+      - ${user.username} recent messages: ${userContext}
+      - ${targetUser.username} recent messages: ${targetContext}
+      For each round, write a 1-line roast from each person (6 lines total). Format it as:
+      Round 1: [user1 roast], [user2 roast]
+      Round 2: [user1 roast], [user2 roast]
+      Round 3: [user1 roast], [user2 roast]
+      Keep it extremely Gen-Z, funny, and referencing their actual speech pattern or content.`;
+
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1644,10 +1855,18 @@ client.on('interactionCreate', async (interaction) => {
         user.username,
         user.id,
         await db.getBanishBlessStatus(user.id),
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
 
-      const winner = Math.random() > 0.5 ? user : targetUser;
+      const auraDiff = userAura - targetAura;
+      const baseChance = 0.5;
+      const userWinChance = Math.max(0.35, Math.min(0.65, baseChance + (auraDiff / 100) * 0.05));
+      const winner = Math.random() < userWinChance ? user : targetUser;
       const points = Math.floor(Math.random() * 50) + 10;
       await db.adjustAuraPoints(winner.id, points);
 
@@ -1661,7 +1880,14 @@ client.on('interactionCreate', async (interaction) => {
     if (commandName === 'fakequote') {
       await interaction.deferReply();
       const targetUser = interaction.options.getUser('user');
-      const promptText = `Generate a fake, absurd quote attributed to the user ${targetUser.username}. The quote can be deep, inspirational, brainrot or ridiculous Gen-Z wisdom (1 sentence).`;
+      
+      const channelMsgs = await interaction.channel.messages.fetch({ limit: 50 });
+      const targetMsgs = channelMsgs.filter(m => m.author.id === targetUser.id && !m.author.bot).toJSON().slice(0, 10).map(m => m.content).filter(Boolean);
+      const msgsContext = targetMsgs.length > 0 ? targetMsgs.join(' | ') : "No recent messages";
+
+      const promptText = `Generate a fake, absurd quote attributed to the user ${targetUser.username}. The quote should mimic their speech pattern, tone, and vocabulary based on their recent messages: "${msgsContext}". The quote can be deep, inspirational, brainrot or ridiculous Gen-Z wisdom (1 sentence). Do not quote them verbatim, make up something fake.`;
+
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1669,7 +1895,12 @@ client.on('interactionCreate', async (interaction) => {
         targetUser.username,
         targetUser.id,
         await db.getBanishBlessStatus(targetUser.id),
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
       return interaction.editReply(
         `> ✍️ *"${response.content}"*\n` +
@@ -1681,6 +1912,8 @@ client.on('interactionCreate', async (interaction) => {
     if (commandName === 'dare') {
       await interaction.deferReply();
       const promptText = `Generate a highly cringe, funny, and safe Gen-Z brainrot dare challenge (1 sentence). Examples: 'Go to a public channel and say you look like a skibidi toilet', 'message a random person and tell them they have zero aura points'. Keep it extremely funny and slang-filled.`;
+      
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1688,7 +1921,12 @@ client.on('interactionCreate', async (interaction) => {
         user.username,
         user.id,
         await db.getBanishBlessStatus(user.id),
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
       return interaction.editReply(`🎲 **Dare for <@${user.id}>**: ${response.content}`);
     }
@@ -1698,6 +1936,8 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({ content: 'sending confession anonymously...', ephemeral: true });
       
       const promptText = `Generate a funny, highly judgmental, and sarcastic Gen-Z commentary (1-2 sentences) on this anonymous confession: "${confession}"`;
+      
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1705,7 +1945,12 @@ client.on('interactionCreate', async (interaction) => {
         'anonymous',
         'anonymous_id',
         null,
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
       
       return interaction.channel.send(`🤫 **Anonymous Confession**: "${confession}"\n💬 **lilgooner's verdict**: ${response.content}`);
@@ -1717,10 +1962,25 @@ client.on('interactionCreate', async (interaction) => {
       if (targetUser.id === user.id) {
         return interaction.editReply("you can't ratio yourself, that's an automatic L 💀");
       }
-      const pctSelf = Math.floor(Math.random() * 101);
+      
+      const channelMsgs = await interaction.channel.messages.fetch({ limit: 50 });
+      const selfCount = channelMsgs.filter(m => m.author.id === user.id).size;
+      const targetCount = channelMsgs.filter(m => m.author.id === targetUser.id).size;
+      
+      const selfAura = await db.getAuraPoints(user.id);
+      const targetAura = await db.getAuraPoints(targetUser.id);
+      
+      const selfWeight = selfCount + (selfAura / 20);
+      const targetWeight = targetCount + (targetAura / 20);
+      
+      const totalWeight = selfWeight + targetWeight || 1;
+      let pctSelf = Math.floor((selfWeight / totalWeight) * 100);
+      pctSelf = Math.max(5, Math.min(95, pctSelf));
       const pctTarget = 100 - pctSelf;
       
       const promptText = `Generate a 1-sentence hilarious explanation of why <@${user.id}> successfully ratioed <@${targetUser.id}> (scores: ${pctSelf} vs ${pctTarget}) or why they failed miserably. Make it extremely Gen-Z and slang-heavy.`;
+      
+      const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
       const response = await groq.queryGroq(
         [{ role: 'user', content: promptText }],
         false,
@@ -1728,7 +1988,12 @@ client.on('interactionCreate', async (interaction) => {
         user.username,
         user.id,
         await db.getBanishBlessStatus(user.id),
-        false
+        false,
+        null,
+        false,
+        false,
+        null,
+        isPrincess
       );
       
       const winner = pctSelf > pctTarget ? `<@${user.id}>` : `<@${targetUser.id}>`;
@@ -1763,6 +2028,18 @@ client.on('interactionCreate', async (interaction) => {
             }
           }
           
+          // Check Princess mode
+          const princessActive = princessMode.has(guildId) && princessMode.get(guildId);
+          activeEffects.push(`- **Princess Mode**: ${princessActive ? 'Active 🎀' : 'Inactive'}`);
+
+          // Check Lockdown mode
+          if (lockdownMode.has(guildId)) {
+            const expires = lockdownMode.get(guildId);
+            if (Date.now() < expires) {
+              activeEffects.push(`- **Lockdown Mode**: Active (Expires in ${Math.round((expires - Date.now()) / 60000)}m)`);
+            }
+          }
+
           // Check brainrot mode
           if (brainrotMode.has(guildId) && brainrotMode.get(guildId)) {
             activeEffects.push(`- **Brainrot Mode**: Active bot-wide`);
@@ -1837,6 +2114,7 @@ client.on('interactionCreate', async (interaction) => {
             const userAura = await db.getAuraPoints(user.id);
             const promptText = `Generate a 1-sentence savage roast or funny compliment for user ${user.username} (Aura points: ${userAura}) who reacted to our server vibe check.`;
             try {
+              const isPrincess = princessMode.has(guildId) && princessMode.get(guildId);
               const response = await groq.queryGroq(
                 [{ role: 'user', content: promptText }],
                 false,
@@ -1844,7 +2122,12 @@ client.on('interactionCreate', async (interaction) => {
                 user.username,
                 user.id,
                 await db.getBanishBlessStatus(user.id),
-                false
+                false,
+                null,
+                false,
+                false,
+                null,
+                isPrincess
               );
               await vMsg.reply(`<@${user.id}>: ${response.content}`);
             } catch (err) {
@@ -1893,6 +2176,86 @@ client.on('interactionCreate', async (interaction) => {
             content: `slowmode set to ${seconds} seconds between bot responses for the next ${duration} minutes.`,
             ephemeral: true
           });
+        }
+
+        case 'warn': {
+          const targetUser = interaction.options.getUser('user');
+          const reason = interaction.options.getString('reason');
+          
+          const newAura = await db.adjustAuraPoints(targetUser.id, -50);
+          
+          await interaction.channel.send(`⚠️ **WARNING** ⚠️ <@${targetUser.id}> has been officially warned by an admin.\nReason: "${reason}". Keep it together or you're getting muted. 💀`);
+          
+          return interaction.reply({
+            content: `Warned <@${targetUser.id}> and deducted 50 aura points (new total: ${newAura}).`,
+            ephemeral: true
+          });
+        }
+
+        case 'lockdown': {
+          const duration = interaction.options.getInteger('duration') || 10;
+          const expiresAt = Date.now() + duration * 60 * 1000;
+          lockdownMode.set(guildId, expiresAt);
+          
+          await interaction.channel.send(`🔒 **LOCKDOWN ACTIVE** 🔒 Bot is in lockdown mode for the next ${duration} minutes. Only admins can interact.`);
+          
+          return interaction.reply({
+            content: `Bot lockdown enabled for ${duration} minutes.`,
+            ephemeral: true
+          });
+        }
+
+        case 'poll': {
+          const question = interaction.options.getString('question');
+          
+          await interaction.reply({
+            content: `Creating poll for: "${question}"`,
+            ephemeral: true
+          });
+
+          const pollMsg = await interaction.channel.send(
+            `📊 **POLL**: "${question}"\n` +
+            `✅ Yes | ❌ No\n` +
+            `Voting closes in 60 seconds!`
+          );
+
+          try {
+            await pollMsg.react('✅');
+            await pollMsg.react('❌');
+          } catch (e) {
+            console.error('Failed to react to poll message:', e);
+          }
+
+          setTimeout(async () => {
+            try {
+              const fetchedMsg = await interaction.channel.messages.fetch(pollMsg.id);
+              let yesVotes = 0;
+              let noVotes = 0;
+
+              const yesReaction = fetchedMsg.reactions.cache.get('✅');
+              const noReaction = fetchedMsg.reactions.cache.get('❌');
+
+              if (yesReaction) yesVotes = Math.max(0, yesReaction.count - 1);
+              if (noReaction) noVotes = Math.max(0, noReaction.count - 1);
+
+              let winnerText = 'Tie 🤝';
+              if (yesVotes > noVotes) {
+                winnerText = 'Yes ✅';
+              } else if (noVotes > yesVotes) {
+                winnerText = 'No ❌';
+              }
+
+              await interaction.channel.send(
+                `📊 **POLL RESULTS**: "${question}"\n` +
+                `✅ Yes: ${yesVotes} votes | ❌ No: ${noVotes} votes\n` +
+                `🏆 Winner: **${winnerText}**`
+              );
+            } catch (err) {
+              console.error('Error ending poll:', err);
+            }
+          }, 60000);
+
+          return;
         }
       }
     }
