@@ -157,11 +157,11 @@ async function registerSlashCommands() {
       )
       .toJSON(),
 
-    // Owner commands
+    // Owner commands — HIDDEN from everyone; only owner (lamey) can see & use
     new SlashCommandBuilder()
       .setName('owner')
       .setDescription('Lilgooner owner controls (lamey only)')
-      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .setDefaultMemberPermissions('0')
       .addSubcommand(sub =>
         sub.setName('banish')
           .setDescription('Banish a user to receive savage roasts')
@@ -1201,10 +1201,10 @@ client.on('interactionCreate', async (interaction) => {
      (interaction.member.permissions.has(PermissionFlagsBits.ManageMessages) || 
       interaction.member.permissions.has(PermissionFlagsBits.Administrator)));
 
-  // Gating checks
+  // Gate: owner command is hidden in Discord UI, but if someone somehow triggers it, silently ignore
   if (commandName === 'owner' && !isOwner) {
     return interaction.reply({
-      content: "Refused: You aren't lamey, stop trying to use owner powers 💀",
+      content: "❌",
       ephemeral: true
     });
   }

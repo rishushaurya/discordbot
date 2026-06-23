@@ -1,8 +1,8 @@
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Uncensored models optimized for roleplay and NSFW conversations
-const PRIMARY_MODEL = 'nousresearch/hermes-3-llama-3.1-8b';
-const FALLBACK_MODEL = 'gryphe/mythomax-l2-13b';
+const PRIMARY_MODEL = 'gryphe/mythomax-l2-13b';         // Uncensored, great for roleplay
+const FALLBACK_MODEL = 'nousresearch/nous-hermes-2-mixtral-8x7b-dpo'; // Strong fallback
 
 // OpenRouter Rate Limiter (Max 30 requests per minute)
 const openRouterCallTimestamps = [];
